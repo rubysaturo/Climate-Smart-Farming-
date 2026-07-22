@@ -1,0 +1,72 @@
+<svg xmlns="http://www.w3.org/2000/svg" width="600" height="650" viewBox="0 0 600 650">
+  <defs>
+    <marker id="arrow" viewBox="0 0 10 10" refX="10" refY="5" markerWidth="6" markerHeight="6" orient="auto-start-reverse">
+      <path d="M 0 0 L 10 5 L 0 10 z" fill="black" />
+    </marker>
+  </defs>
+  <style>
+    .start-end { fill: #ffffff; stroke: #000000; stroke-width: 2; rx: 20; ry: 20; }
+    .process { fill: #ffffff; stroke: #000000; stroke-width: 2; }
+    .decision { fill: #ffffff; stroke: #000000; stroke-width: 2; }
+    .line { stroke: #000000; stroke-width: 2; fill: none; marker-end: url(#arrow); }
+    .text { font-family: 'Segoe UI', Arial, sans-serif; font-size: 13px; fill: #000000; text-anchor: middle; dominant-baseline: middle; }
+    .title { font-family: 'Segoe UI', Arial, sans-serif; font-size: 18px; font-weight: bold; fill: #000000; text-anchor: middle; }
+  </style>
+  
+  <!-- Background -->
+  <rect width="100%" height="100%" fill="white" />
+  
+  <!-- Title -->
+  <text x="300" y="30" class="title">Dashboard &amp; Weather Flowchart</text>
+  
+  <!-- Start -->
+  <rect x="220" y="70" width="160" height="40" class="start-end" />
+  <text x="300" y="90" class="text">START: Open Dashboard</text>
+  
+  <!-- Fetch County -->
+  <rect x="200" y="140" width="200" height="50" class="process" />
+  <text x="300" y="165" class="text">Get User registered county</text>
+  
+  <!-- Fetch Weather -->
+  <rect x="200" y="220" width="200" height="50" class="process" />
+  <text x="300" y="245" class="text">Request Weather API Data</text>
+  
+  <!-- Decision: API Success? -->
+  <polygon points="300,300 400,340 300,380 200,340" class="decision" />
+  <text x="300" y="340" class="text">API Success?</text>
+  
+  <!-- Fallback Weather -->
+  <rect x="430" y="315" width="140" height="50" class="process" />
+  <text x="500" y="340" class="text">Display Fallback Data</text>
+  
+  <!-- Render UI -->
+  <rect x="200" y="420" width="200" height="50" class="process" />
+  <text x="300" y="445" class="text">Render Forecast &amp; Advisory</text>
+  
+  <!-- Action Recommendations -->
+  <rect x="200" y="500" width="200" height="50" class="process" />
+  <text x="300" y="525" class="text">Generate Farming Advisories</text>
+  
+  <!-- End -->
+  <rect x="220" y="580" width="160" height="40" class="start-end" />
+  <text x="300" y="600" class="text">END: Dashboard Active</text>
+  
+  <!-- Connections -->
+  <path d="M 300 110 L 300 140" class="line" />
+  <path d="M 300 190 L 300 220" class="line" />
+  <path d="M 300 270 L 300 300" class="line" />
+  
+  <!-- Decision No -->
+  <path d="M 400 340 L 430 340" class="line" />
+  <text x="415" y="330" class="text" style="font-size: 11px;">No</text>
+  
+  <!-- Decision Yes -->
+  <path d="M 300 380 L 300 420" class="line" />
+  <text x="310" y="395" class="text" style="font-size: 11px;">Yes</text>
+  
+  <!-- Fallback to Render -->
+  <path d="M 500 365 L 500 445 L 400 445" class="line" />
+  
+  <path d="M 300 470 L 300 500" class="line" />
+  <path d="M 300 550 L 300 580" class="line" />
+</svg>

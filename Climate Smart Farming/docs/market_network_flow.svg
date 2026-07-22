@@ -1,0 +1,95 @@
+<svg xmlns="http://www.w3.org/2000/svg" width="600" height="580" viewBox="0 0 600 580">
+  <defs>
+    <marker id="arrow" viewBox="0 0 10 10" refX="10" refY="5" markerWidth="6" markerHeight="6" orient="auto-start-reverse">
+      <path d="M 0 0 L 10 5 L 0 10 z" fill="black" />
+    </marker>
+  </defs>
+  <style>
+    .start-end { fill: #ffffff; stroke: #000000; stroke-width: 2; rx: 20; ry: 20; }
+    .process { fill: #ffffff; stroke: #000000; stroke-width: 2; }
+    .decision { fill: #ffffff; stroke: #000000; stroke-width: 2; }
+    .line { stroke: #000000; stroke-width: 2; fill: none; marker-end: url(#arrow); }
+    .text { font-family: 'Segoe UI', Arial, sans-serif; font-size: 13px; fill: #000000; text-anchor: middle; dominant-baseline: middle; }
+    .title { font-family: 'Segoe UI', Arial, sans-serif; font-size: 18px; font-weight: bold; fill: #000000; text-anchor: middle; }
+  </style>
+  
+  <!-- Background -->
+  <rect width="100%" height="100%" fill="white" />
+  
+  <!-- Title -->
+  <text x="300" y="30" class="title">Market Insights &amp; Farmer Network Flowchart</text>
+  
+  <!-- Start -->
+  <rect x="220" y="60" width="160" height="40" class="start-end" />
+  <text x="300" y="80" class="text">START</text>
+  
+  <!-- Market Pricing -->
+  <rect x="40" y="130" width="220" height="50" class="process" />
+  <text x="150" y="155" class="text">Fetch Commodity Prices by Region</text>
+  
+  <!-- Forum Network -->
+  <rect x="340" y="130" width="220" height="50" class="process" />
+  <text x="450" y="155" class="text">Fetch Forum Timeline Posts</text>
+  
+  <!-- Decision: Want SMS Updates? -->
+  <polygon points="150,200 220,240 150,280 80,240" class="decision" />
+  <text x="150" y="240" class="text">Want SMS?</text>
+  
+  <!-- Decision: Create Post? -->
+  <polygon points="450,200 520,240 450,280 380,240" class="decision" />
+  <text x="450" y="240" class="text">Create Post?</text>
+  
+  <!-- Market SMS Sub -->
+  <rect x="30" y="320" width="100" height="45" class="process" />
+  <text x="80" y="342.5" class="text">Opt-in SMS Alert</text>
+  
+  <!-- Market Standard View -->
+  <rect x="150" y="320" width="100" height="45" class="process" />
+  <text x="200" y="342.5" class="text">Display Prices</text>
+  
+  <!-- Network Post Form -->
+  <rect x="330" y="320" width="110" height="45" class="process" />
+  <text x="385" y="342.5" class="text">Submit New Post</text>
+  
+  <!-- Network Forum Render -->
+  <rect x="460" y="320" width="110" height="45" class="process" />
+  <text x="515" y="342.5" class="text">Render Feed</text>
+  
+  <!-- Complete -->
+  <rect x="200" y="420" width="200" height="50" class="process" />
+  <text x="300" y="445" class="text">Update User Interface</text>
+  
+  <!-- End -->
+  <rect x="220" y="500" width="160" height="40" class="start-end" />
+  <text x="300" y="520" class="text">END</text>
+  
+  <!-- Connections -->
+  <path d="M 220 80 L 150 80 L 150 130" class="line" />
+  <path d="M 380 80 L 450 80 L 450 130" class="line" />
+  
+  <path d="M 150 180 L 150 200" class="line" />
+  <path d="M 450 180 L 450 200" class="line" />
+  
+  <!-- Market Decisions -->
+  <path d="M 80 240 L 80 320" class="line" />
+  <text x="65" y="270" class="text" style="font-size: 11px;">Yes</text>
+  
+  <path d="M 220 240 L 220 320" class="line" />
+  <text x="235" y="270" class="text" style="font-size: 11px;">No</text>
+  
+  <!-- Network Decisions -->
+  <path d="M 380 240 L 380 320" class="line" />
+  <text x="365" y="270" class="text" style="font-size: 11px;">Yes</text>
+  
+  <path d="M 520 240 L 520 320" class="line" />
+  <text x="535" y="270" class="text" style="font-size: 11px;">No</text>
+  
+  <!-- Merge paths -->
+  <path d="M 80 365 L 80 400 L 250 400 L 250 420" class="line" />
+  <path d="M 200 365 L 200 400 L 270 400 L 270 420" class="line" />
+  
+  <path d="M 385 365 L 385 400 L 330 400 L 330 420" class="line" />
+  <path d="M 515 365 L 515 400 L 350 400 L 350 420" class="line" />
+  
+  <path d="M 300 470 L 300 500" class="line" />
+</svg>
