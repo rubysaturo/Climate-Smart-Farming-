@@ -7,7 +7,8 @@ class UserSerializer(serializers.ModelSerializer):
     class Meta:
         model = User
         fields = ('id', 'username', 'email', 'name', 'role', 'phone_number', 'sector', 
-                  'sms_weather', 'sms_soil', 'sms_market', 'sms_app', 'profile_picture')
+                  'sms_weather', 'sms_soil', 'sms_market', 'sms_app', 'profile_picture',
+                  'supabase_uid')
         read_only_fields = ('id', 'role')
 
 class RegisterSerializer(serializers.ModelSerializer):
@@ -15,7 +16,8 @@ class RegisterSerializer(serializers.ModelSerializer):
     
     class Meta:
         model = User
-        fields = ('username', 'password', 'email', 'name', 'role', 'phone_number', 'sector')
+        fields = ('username', 'password', 'email', 'name', 'role', 'phone_number', 'sector',
+                  'supabase_uid')
         
     def validate_email(self, value):
         if not value:

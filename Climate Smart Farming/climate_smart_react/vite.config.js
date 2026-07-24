@@ -12,5 +12,20 @@ export default defineConfig({
         secure: false
       }
     }
+  },
+  build: {
+    chunkSizeWarningLimit: 1000,
+    rollupOptions: {
+      output: {
+        manualChunks: {
+          // Split vendor libraries into separate chunks
+          'react-vendor': ['react', 'react-dom'],
+          'router': ['react-router-dom'],
+          'supabase': ['@supabase/supabase-js'],
+          'axios': ['axios'],
+          'leaflet': ['leaflet', 'react-leaflet'],
+        }
+      }
+    }
   }
 })

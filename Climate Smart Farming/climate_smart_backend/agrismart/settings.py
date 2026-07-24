@@ -129,3 +129,9 @@ CORS_ALLOWED_ORIGINS = config(
     cast=Csv()
 )
 CORS_ALLOW_CREDENTIALS = True
+
+# Allow all Vercel preview + production deployments
+CORS_ALLOWED_ORIGIN_REGEXES = [
+    r'^https://.*\.vercel\.app$',
+    r'^https://climate-smart-farming.*\.vercel\.app$',
+]

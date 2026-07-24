@@ -14,13 +14,17 @@ __pycache__/
 *.sqlite3
 venv/
 .venv/
+staticfiles/
 
-# Environment variables (keep .env.production and .env.example tracked)
+# Environment variables — keep .env.example tracked, NOT real secrets
 .env
 .env.local
 .env.development.local
 .env.test.local
 .env.production.local
+
+# .env.production is committed intentionally (public Supabase anon key only)
+# If Django backend secrets need tracking, use Vercel/Railway env var UI instead
 
 # IDEs & System files
 .vscode/
@@ -28,4 +32,8 @@ venv/
 .DS_Store
 Thumbs.db
 
+# Vercel local config
 .vercel
+
+# Python media/static uploads
+media/

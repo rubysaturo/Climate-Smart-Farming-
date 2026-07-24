@@ -207,6 +207,21 @@ export const AuthProvider = ({ children }) => {
     }
   };
 
+  // ── FORGOT PASSWORD ──────────────────────────────────────────────────────
+  const forgotPassword = async (email) => {
+    setAuthError(null);
+    try {
+      const { error } = await supabase.auth.resetPasswordForEmail(email, {
+        redirectTo: `${window.location.origin}/reset-password`
+      });
+      if (error) throw new Error(error.message);
+      return true;
+    } catch (err) {
+      setAuthError(err.message);
+      throw err;
+    }
+  };
+
   // ── LOGOUT ────────────────────────────────────────────────────────────────
   const logout = async () => {
     try { await supabase.auth.signOut(); } catch (_) {}
@@ -253,6 +268,7 @@ export const AuthProvider = ({ children }) => {
       logout,
       register,
       updateProfile,
+      forgotPassword,
       theme,
       toggleTheme
     }}>

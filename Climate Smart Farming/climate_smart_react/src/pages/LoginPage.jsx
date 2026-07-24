@@ -4,7 +4,6 @@ import { AuthContext } from '../context/AuthContext';
 import loginBg from '../assets/login-bg.jpg';
 import Toast from '../components/Toast';
 import Modal from '../components/Modal';
-import api from '../api/axios';
 
 /* ─── inline keyframes injected once ─── */
 const shakeStyle = `
@@ -21,7 +20,7 @@ const shakeStyle = `
 `;
 
 const LoginPage = () => {
-  const { login, isAuthenticated } = useContext(AuthContext);
+  const { login, isAuthenticated, forgotPassword } = useContext(AuthContext);
   const navigate = useNavigate();
 
   const [username, setUsername] = useState('');
@@ -101,44 +100,34 @@ const LoginPage = () => {
   };
 
   const handleGoogleSignIn = async () => {
-    try {
-      const googleUser = {
-        name: 'Google Farmer',
-        username: 'google_farmer',
-        email: 'google.farmer@gmail.com',
-        phone_number: '+254700000000',
-        sector: 'Nakuru County - Njoro Subcounty (Wheat)',
-        role: 'farmer',
-        password: 'GooglePass123!'
-      };
-
-      try {
-        await api.post('/api/auth/register/', googleUser);
-      } catch (regErr) {
-        // Ignored if user already exists
-      }
-
-      const loggedUser = await login('google_farmer', 'GooglePass123!', false);
-      setToast({ message: `Welcome back via Google, ${loggedUser.name}! Redirecting…`, type: 'success' });
-    } catch (err) {
-      setToast({ message: 'Google Sign-In failed to authenticate.', type: 'error' });
-    }
+    // Real Google OAuth not yet configured — inform user
+    setToast({ 
+      message: 'Google Sign-In coming soon. Please use username/password for now.', 
+      type: 'info' 
+    });
   };
 
-  const handleForgotPasswordSubmit = (e) => {
+  const handleForgotPasswordSubmit = async (e) => {
     e.preventDefault();
     if (!forgotEmail) {
       setToast({ message: 'Please enter your email address.', type: 'warning' });
       return;
     }
     
-    setToast({ 
-      message: `Password reset link sent to ${forgotEmail}. Please check your inbox.`, 
-      type: 'success' 
-    });
-    
-    setForgotEmail('');
-    setIsForgotOpen(false);
+    try {
+      await forgotPassword(forgotEmail);
+      setToast({ 
+        message: `Password reset link sent to ${forgotEmail}. Please check your inbox.`, 
+        type: 'success' 
+      });
+      setForgotEmail('');
+      setIsForgotOpen(false);
+    } catch (err) {
+      setToast({
+        message: err.message || 'Failed to send reset email. Please try again.',
+        type: 'error'
+      });
+    }
   };
 
   /* shared error border style */
