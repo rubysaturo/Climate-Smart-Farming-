@@ -12,18 +12,22 @@ export const AuthProvider = ({ children }) => {
   // On mount: check for existing Supabase session OR legacy localStorage session
   useEffect(() => {
     const initAuth = async () => {
-      // Check Supabase session first
-      const { data: { session } } = await supabase.auth.getSession();
-      if (session?.user) {
-        const profile = await fetchProfile(session.user.id);
-        if (profile) {
-          setUser(profile);
-          setLoading(false);
-          return;
+      try {
+        // Check Supabase session first
+        const { data: { session } } = await supabase.auth.getSession();
+        if (session?.user) {
+          const profile = await fetchProfile(session.user.id);
+          if (profile) {
+            setUser(profile);
+            setLoading(false);
+            return;
+          }
         }
+      } catch (err) {
+        console.warn('Supabase session check warning:', err);
       }
 
-      // Fallback: legacy localStorage user (from old Django JWT sessions)
+      // Fallback: localStorage user session
       const storedUser = localStorage.getItem('agrismart_user') || sessionStorage.getItem('agrismart_user');
       if (storedUser) {
         try { setUser(JSON.parse(storedUser)); } catch (_) {}
@@ -60,7 +64,7 @@ export const AuthProvider = ({ children }) => {
         .from('accounts_customuser')
         .select('*')
         .eq('supabase_uid', supabaseUserId)
-        .single();
+        .maybeSingle();
       if (error || !data) return null;
       return data;
     } catch (_) {
@@ -75,7 +79,7 @@ export const AuthProvider = ({ children }) => {
       const { username, password, email, name, phone_number, sector, role } = signUpData;
 
       // 1. Create user in Supabase Auth
-      const { data: authData, error: authError } = await supabase.auth.signUp({
+      const { data: authData, error: authErr } = await supabase.auth.signUp({
         email,
         password,
         options: {
@@ -83,7 +87,10 @@ export const AuthProvider = ({ children }) => {
         }
       });
 
-      if (authError) throw new Error(authError.message);
+      if (authErr) {
+        console.error('Supabase Auth signUp error:', authErr);
+        throw new Error(authErr.message);
+      }
       if (!authData?.user) throw new Error('Registration failed. Please try again.');
 
       // 2. Store profile in accounts_customuser table
@@ -110,7 +117,7 @@ export const AuthProvider = ({ children }) => {
         }]);
 
       if (profileError) {
-        // Username or email already exists
+        console.error('Profile insert error:', profileError);
         if (profileError.code === '23505') {
           throw new Error('Username or email already exists. Please choose a different one.');
         }
@@ -119,55 +126,82 @@ export const AuthProvider = ({ children }) => {
 
       return authData.user;
     } catch (err) {
+      console.error('Register failed:', err);
       setAuthError(err.message);
       throw err;
     }
   };
 
   // ── LOGIN ──────────────────────────────────────────────────────────────────
-  const login = async (username, password, saveInfo) => {
+  const login = async (usernameOrEmail, password, saveInfo) => {
     setAuthError(null);
     try {
-      // Try to find user's email from username in our table
-      const { data: profileData, error: lookupError } = await supabase
-        .from('accounts_customuser')
-        .select('email, username, role, name, sector, phone_number, sms_weather, sms_soil, sms_market, sms_app, id')
-        .eq('username', username)
-        .single();
+      let emailToAuth = usernameOrEmail;
+      let profileData = null;
 
-      if (lookupError || !profileData) {
-        throw new Error('Invalid username or password');
+      // 1. Try finding user profile by username or email in accounts_customuser
+      const { data: byUsername } = await supabase
+        .from('accounts_customuser')
+        .select('*')
+        .eq('username', usernameOrEmail)
+        .maybeSingle();
+
+      if (byUsername) {
+        profileData = byUsername;
+        emailToAuth = byUsername.email;
+      } else {
+        const { data: byEmail } = await supabase
+          .from('accounts_customuser')
+          .select('*')
+          .eq('email', usernameOrEmail)
+          .maybeSingle();
+        if (byEmail) {
+          profileData = byEmail;
+          emailToAuth = byEmail.email;
+        }
       }
 
-      // Sign in with Supabase Auth using email
+      // 2. Sign in with Supabase Auth
       const { data: authData, error: authErr } = await supabase.auth.signInWithPassword({
-        email: profileData.email,
+        email: emailToAuth,
         password
       });
 
-      if (authErr) throw new Error('Invalid username or password');
+      if (authErr) {
+        console.error('Supabase Auth signIn error:', authErr);
+        throw new Error('Invalid username/email or password');
+      }
 
-      const userData = {
+      // 3. Build user data object
+      const userData = profileData ? {
         id: profileData.id,
         username: profileData.username,
         email: profileData.email,
-        name: profileData.name,
-        role: profileData.role,
+        name: profileData.name || profileData.username,
+        role: profileData.role || 'farmer',
         sector: profileData.sector,
         phone_number: profileData.phone_number,
         sms_weather: profileData.sms_weather,
         sms_soil: profileData.sms_soil,
         sms_market: profileData.sms_market,
         sms_app: profileData.sms_app,
+      } : {
+        id: authData.user.id,
+        username: authData.user.user_metadata?.username || usernameOrEmail,
+        email: authData.user.email,
+        name: authData.user.user_metadata?.name || usernameOrEmail,
+        role: 'farmer',
+        sector: 'Sector 74 - Premium Wheat Estate',
       };
 
       const storage = saveInfo ? localStorage : sessionStorage;
       storage.setItem('agrismart_user', JSON.stringify(userData));
       if (saveInfo) localStorage.setItem('agrismart_save_info', 'true');
 
-      setTimeout(() => setUser(userData), 1500);
+      setUser(userData);
       return userData;
     } catch (err) {
+      console.error('Login failed:', err);
       setAuthError(err.message);
       throw err;
     }
@@ -175,7 +209,7 @@ export const AuthProvider = ({ children }) => {
 
   // ── LOGOUT ────────────────────────────────────────────────────────────────
   const logout = async () => {
-    await supabase.auth.signOut();
+    try { await supabase.auth.signOut(); } catch (_) {}
     setUser(null);
     localStorage.removeItem('agrismart_access');
     localStorage.removeItem('agrismart_refresh');
@@ -194,11 +228,11 @@ export const AuthProvider = ({ children }) => {
         .update(profileData)
         .eq('username', user?.username)
         .select()
-        .single();
+        .maybeSingle();
 
       if (error) throw new Error('Failed to update profile');
 
-      const updatedUser = { ...user, ...data };
+      const updatedUser = { ...user, ...(data || profileData) };
       setUser(updatedUser);
 
       const storage = localStorage.getItem('agrismart_save_info') === 'true' ? localStorage : sessionStorage;

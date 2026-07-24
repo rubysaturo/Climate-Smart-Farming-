@@ -15,7 +15,7 @@ __pycache__/
 venv/
 .venv/
 
-# Environment variables
+# Environment variables (keep .env.production and .env.example tracked)
 .env
 .env.local
 .env.development.local
@@ -29,4 +29,3 @@ venv/
 Thumbs.db
 
 .vercel
-.env*
