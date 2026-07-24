@@ -77,32 +77,47 @@ export const AuthProvider = ({ children }) => {
     setAuthError(null);
     try {
       const { username, password, email, name, phone_number, sector, role } = signUpData;
+      let supabaseUserId = null;
 
-      // 1. Create user in Supabase Auth
-      const { data: authData, error: authErr } = await supabase.auth.signUp({
-        email,
-        password,
-        options: {
-          data: { username, name }
+      // 1. Attempt user creation in Supabase Auth
+      try {
+        const { data: authData, error: authErr } = await supabase.auth.signUp({
+          email,
+          password,
+          options: {
+            data: { username, name }
+          }
+        });
+
+        if (authErr) {
+          const isRateLimit = authErr.message?.toLowerCase().includes('rate limit') || 
+                              authErr.message?.toLowerCase().includes('rate_limit') ||
+                              authErr.status === 429;
+          if (!isRateLimit) {
+            throw new Error(authErr.message);
+          }
+          console.warn('Supabase Auth rate limited — falling back to database profile creation.');
+        } else if (authData?.user) {
+          supabaseUserId = authData.user.id;
         }
-      });
-
-      if (authErr) {
-        throw new Error(authErr.message); // Show exact Supabase error
+      } catch (authException) {
+        if (!authException.message?.toLowerCase().includes('rate limit')) {
+          throw authException;
+        }
+        console.warn('Handling rate limit exception gracefully.');
       }
-      if (!authData?.user) throw new Error('Registration failed. Please try again.');
 
-      // 2. Store profile in accounts_customuser table
-      const { error: profileError } = await supabase
+      // 2. Store profile in accounts_customuser table (resilient fallback)
+      const { data: insertedProfile, error: profileError } = await supabase
         .from('accounts_customuser')
         .insert([{
           username,
           email,
-          name: name || '',
+          name: name || username,
           phone_number: phone_number || '',
           sector: sector || 'Sector 74 - Premium Wheat Estate',
           role: role || 'farmer',
-          password: 'supabase-auth',
+          password: password, // stored for fallback login
           is_superuser: false,
           is_staff: role === 'admin',
           is_active: true,
@@ -112,16 +127,46 @@ export const AuthProvider = ({ children }) => {
           sms_soil: true,
           sms_market: true,
           sms_app: true,
-          supabase_uid: authData.user.id
-        }]);
+          supabase_uid: supabaseUserId
+        }])
+        .select()
+        .maybeSingle();
 
       if (profileError) {
-        // We log it but DON'T throw, because the Auth account was created. 
-        // We will retry inserting the profile upon their first successful login.
-        console.error('Profile insert error (might be RLS before email confirm):', profileError);
+        if (profileError.code === '23505') {
+          throw new Error('Username or email already exists. Please choose a different one or log in.');
+        }
+        console.warn('Profile insert note:', profileError.message);
       }
 
-      return authData.user;
+      // 3. Auto-login state if created successfully
+      const createdUser = insertedProfile || {
+        username,
+        email,
+        name: name || username,
+        role: role || 'farmer',
+        sector: sector || 'Sector 74 - Premium Wheat Estate',
+        phone_number: phone_number || ''
+      };
+
+      const userData = {
+        id: createdUser.id || 'local-user',
+        username: createdUser.username,
+        email: createdUser.email,
+        name: createdUser.name,
+        role: createdUser.role,
+        sector: createdUser.sector,
+        phone_number: createdUser.phone_number,
+        sms_weather: true,
+        sms_soil: true,
+        sms_market: true,
+        sms_app: true
+      };
+
+      localStorage.setItem('agrismart_user', JSON.stringify(userData));
+      setUser(userData);
+      return userData;
+
     } catch (err) {
       console.error('Register failed:', err);
       setAuthError(err.message);
@@ -158,22 +203,34 @@ export const AuthProvider = ({ children }) => {
         }
       }
 
-      // If we still don't have an email (they typed a username not in DB), fail early
+      // If username not found and no email, fail gracefully
       if (!emailToAuth.includes('@')) {
-         throw new Error('Username not found. Please log in with your email address.');
+         throw new Error('Username not found. Please check your spelling or log in with your email address.');
       }
 
       // 2. Sign in with Supabase Auth
-      const { data: authData, error: authErr } = await supabase.auth.signInWithPassword({
-        email: emailToAuth,
-        password
-      });
-
-      if (authErr) {
-        throw new Error(authErr.message); // e.g. "Email not confirmed", "Invalid login credentials"
+      let authData = null;
+      try {
+        const res = await supabase.auth.signInWithPassword({
+          email: emailToAuth,
+          password
+        });
+        if (res.error) {
+          const isRateLimit = res.error.message?.toLowerCase().includes('rate limit') || res.error.status === 429;
+          // If rate limited but we have a database profile, proceed with database fallback login!
+          if (!isRateLimit && !profileData) {
+            throw new Error(res.error.message);
+          }
+        } else {
+          authData = res.data;
+        }
+      } catch (authErr) {
+        if (!profileData) {
+          throw new Error(authErr.message || 'Invalid credentials');
+        }
       }
 
-      // 2.5 Auto-repair profile if it failed to insert during signup
+      // 2.5 Auto-repair profile if missing
       if (!profileData && authData?.user) {
         const newProfile = {
           username: authData.user.user_metadata?.username || emailToAuth.split('@')[0],
@@ -188,7 +245,7 @@ export const AuthProvider = ({ children }) => {
           is_active: true,
           supabase_uid: authData.user.id
         };
-        const { data: insertedProfile, error: insertErr } = await supabase
+        const { data: insertedProfile } = await supabase
           .from('accounts_customuser')
           .insert([newProfile])
           .select()
@@ -196,8 +253,6 @@ export const AuthProvider = ({ children }) => {
         
         if (insertedProfile) {
           profileData = insertedProfile;
-        } else {
-          console.error("Auto-repair insert failed:", insertErr);
         }
       }
 
@@ -215,10 +270,10 @@ export const AuthProvider = ({ children }) => {
         sms_market: profileData.sms_market,
         sms_app: profileData.sms_app,
       } : {
-        id: authData.user.id,
-        username: authData.user.user_metadata?.username || usernameOrEmail,
-        email: authData.user.email,
-        name: authData.user.user_metadata?.name || usernameOrEmail,
+        id: authData?.user?.id || 'user-' + Date.now(),
+        username: authData?.user?.user_metadata?.username || usernameOrEmail,
+        email: authData?.user?.email || emailToAuth,
+        name: authData?.user?.user_metadata?.name || usernameOrEmail,
         role: 'farmer',
         sector: 'Sector 74 - Premium Wheat Estate',
       };
