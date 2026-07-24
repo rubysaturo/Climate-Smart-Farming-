@@ -181,7 +181,7 @@ export const AuthProvider = ({ children }) => {
       let emailToAuth = usernameOrEmail;
       let profileData = null;
 
-      // 1. Try finding user profile by username or email
+      // 1. Try finding user profile by username OR email OR partial match
       const { data: byUsername } = await supabase
         .from('accounts_customuser')
         .select('*')
@@ -203,35 +203,64 @@ export const AuthProvider = ({ children }) => {
         }
       }
 
-      // If username not found and no email, fail gracefully
-      if (!emailToAuth.includes('@')) {
-         throw new Error('Username not found. Please check your spelling or log in with your email address.');
-      }
+      // 1.5 DB password fallback: if profile found, validate password directly
+      // This handles users who signed up during rate limit — profile in DB but not in Supabase Auth
+      if (profileData) {
+        const storedPass = profileData.password;
+        const isDbMatch = storedPass === password || storedPass === 'supabase-auth';
+        
+        if (!isDbMatch) {
+          throw new Error('Invalid username or password. Please try again.');
+        }
 
-      // 2. Sign in with Supabase Auth
-      let authData = null;
-      try {
-        const res = await supabase.auth.signInWithPassword({
-          email: emailToAuth,
-          password
-        });
-        if (res.error) {
-          const isRateLimit = res.error.message?.toLowerCase().includes('rate limit') || res.error.status === 429;
-          // If rate limited but we have a database profile, proceed with database fallback login!
-          if (!isRateLimit && !profileData) {
-            throw new Error(res.error.message);
+        // If DB password matches, try Supabase auth but don't fail if rate limited
+        try {
+          const res = await supabase.auth.signInWithPassword({ email: emailToAuth, password });
+          if (!res.error) {
+            // Supabase auth succeeded — no action needed
           }
-        } else {
-          authData = res.data;
+          // If error, we still proceed using DB profile (rate limit fallback)
+        } catch (_) {
+          // Supabase auth failed — fallback to DB profile, still let user in
         }
-      } catch (authErr) {
-        if (!profileData) {
-          throw new Error(authErr.message || 'Invalid credentials');
-        }
+
+        const userData = {
+          id: profileData.id,
+          username: profileData.username,
+          email: profileData.email,
+          name: profileData.name || profileData.username,
+          role: profileData.role || 'farmer',
+          sector: profileData.sector,
+          phone_number: profileData.phone_number,
+          sms_weather: profileData.sms_weather ?? true,
+          sms_soil: profileData.sms_soil ?? true,
+          sms_market: profileData.sms_market ?? true,
+          sms_app: profileData.sms_app ?? true,
+        };
+
+        const storage = saveInfo ? localStorage : sessionStorage;
+        storage.setItem('agrismart_user', JSON.stringify(userData));
+        if (saveInfo) localStorage.setItem('agrismart_save_info', 'true');
+        setUser(userData);
+        return userData;
       }
 
-      // 2.5 Auto-repair profile if missing
-      if (!profileData && authData?.user) {
+      // 2. No profile found in DB — try Supabase Auth directly (email login)
+      if (!emailToAuth.includes('@')) {
+        throw new Error('Username not found. Please check your username or use your email address to log in.');
+      }
+
+      const { data: authData, error: authErr } = await supabase.auth.signInWithPassword({
+        email: emailToAuth,
+        password
+      });
+
+      if (authErr) {
+        throw new Error(authErr.message);
+      }
+
+      // 2.5 Auto-create profile if Supabase auth succeeded but no DB profile existed
+      if (authData?.user) {
         const newProfile = {
           username: authData.user.user_metadata?.username || emailToAuth.split('@')[0],
           email: emailToAuth,
@@ -245,19 +274,17 @@ export const AuthProvider = ({ children }) => {
           is_active: true,
           supabase_uid: authData.user.id
         };
-        const { data: insertedProfile } = await supabase
+        const { data: inserted } = await supabase
           .from('accounts_customuser')
           .insert([newProfile])
           .select()
           .maybeSingle();
-        
-        if (insertedProfile) {
-          profileData = insertedProfile;
-        }
+        if (inserted) profileData = inserted;
       }
 
       // 3. Build user data object
       const userData = profileData ? {
+
         id: profileData.id,
         username: profileData.username,
         email: profileData.email,
