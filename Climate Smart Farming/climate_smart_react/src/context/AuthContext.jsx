@@ -88,8 +88,7 @@ export const AuthProvider = ({ children }) => {
       });
 
       if (authErr) {
-        console.error('Supabase Auth signUp error:', authErr);
-        throw new Error(authErr.message);
+        throw new Error(authErr.message); // Show exact Supabase error
       }
       if (!authData?.user) throw new Error('Registration failed. Please try again.');
 
@@ -103,7 +102,7 @@ export const AuthProvider = ({ children }) => {
           phone_number: phone_number || '',
           sector: sector || 'Sector 74 - Premium Wheat Estate',
           role: role || 'farmer',
-          password: 'supabase-auth', // placeholder - auth handled by Supabase
+          password: 'supabase-auth',
           is_superuser: false,
           is_staff: role === 'admin',
           is_active: true,
@@ -117,11 +116,9 @@ export const AuthProvider = ({ children }) => {
         }]);
 
       if (profileError) {
-        console.error('Profile insert error:', profileError);
-        if (profileError.code === '23505') {
-          throw new Error('Username or email already exists. Please choose a different one.');
-        }
-        throw new Error(profileError.message || 'Failed to save profile data.');
+        // We log it but DON'T throw, because the Auth account was created. 
+        // We will retry inserting the profile upon their first successful login.
+        console.error('Profile insert error (might be RLS before email confirm):', profileError);
       }
 
       return authData.user;
@@ -139,7 +136,7 @@ export const AuthProvider = ({ children }) => {
       let emailToAuth = usernameOrEmail;
       let profileData = null;
 
-      // 1. Try finding user profile by username or email in accounts_customuser
+      // 1. Try finding user profile by username or email
       const { data: byUsername } = await supabase
         .from('accounts_customuser')
         .select('*')
@@ -161,6 +158,11 @@ export const AuthProvider = ({ children }) => {
         }
       }
 
+      // If we still don't have an email (they typed a username not in DB), fail early
+      if (!emailToAuth.includes('@')) {
+         throw new Error('Username not found. Please log in with your email address.');
+      }
+
       // 2. Sign in with Supabase Auth
       const { data: authData, error: authErr } = await supabase.auth.signInWithPassword({
         email: emailToAuth,
@@ -168,8 +170,35 @@ export const AuthProvider = ({ children }) => {
       });
 
       if (authErr) {
-        console.error('Supabase Auth signIn error:', authErr);
-        throw new Error('Invalid username/email or password');
+        throw new Error(authErr.message); // e.g. "Email not confirmed", "Invalid login credentials"
+      }
+
+      // 2.5 Auto-repair profile if it failed to insert during signup
+      if (!profileData && authData?.user) {
+        const newProfile = {
+          username: authData.user.user_metadata?.username || emailToAuth.split('@')[0],
+          email: emailToAuth,
+          name: authData.user.user_metadata?.name || emailToAuth.split('@')[0],
+          phone_number: '',
+          sector: 'Sector 74 - Premium Wheat Estate',
+          role: 'farmer',
+          password: 'supabase-auth',
+          is_superuser: false,
+          is_staff: false,
+          is_active: true,
+          supabase_uid: authData.user.id
+        };
+        const { data: insertedProfile, error: insertErr } = await supabase
+          .from('accounts_customuser')
+          .insert([newProfile])
+          .select()
+          .maybeSingle();
+        
+        if (insertedProfile) {
+          profileData = insertedProfile;
+        } else {
+          console.error("Auto-repair insert failed:", insertErr);
+        }
       }
 
       // 3. Build user data object
