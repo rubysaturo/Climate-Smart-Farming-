@@ -14,7 +14,7 @@ class CustomUser(AbstractUser):
     profile_picture = models.TextField(blank=True, null=True)
     
     # Links this Django user to the Supabase Auth user
-    supabase_uid = models.UUIDField(unique=True, blank=True, null=True)
+    supabase_uid = models.UUIDField(unique=True, blank=True, null=True, verbose_name="Supabase Auth UID")
 
     # SMS Alert Subscriptions
     sms_weather = models.BooleanField(default=True)
