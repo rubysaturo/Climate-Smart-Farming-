@@ -5,11 +5,23 @@
       "src": "agrismart/wsgi.py",
       "use": "@vercel/python",
       "config": {
-        "maxLambdaSize": "15mb"
+        "maxLambdaSize": "50mb"
       }
     }
   ],
   "routes": [
+    {
+      "src": "/admin/(.*)",
+      "dest": "agrismart/wsgi.py"
+    },
+    {
+      "src": "/api/(.*)",
+      "dest": "agrismart/wsgi.py"
+    },
+    {
+      "src": "/static/(.*)",
+      "dest": "agrismart/wsgi.py"
+    },
     {
       "src": "/(.*)",
       "dest": "agrismart/wsgi.py"

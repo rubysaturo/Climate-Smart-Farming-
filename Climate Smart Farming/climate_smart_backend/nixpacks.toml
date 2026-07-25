@@ -1,5 +1,5 @@
 [phases.setup]
-nixPkgs = ["python311", "gcc"]
+nixPkgs = ["python312", "gcc"]
 
 [phases.install]
 cmds = ["pip install -r requirements.txt"]
@@ -8,4 +8,4 @@ cmds = ["pip install -r requirements.txt"]
 cmds = ["python manage.py collectstatic --noinput"]
 
 [start]
-cmd = "python manage.py migrate --noinput && gunicorn agrismart.wsgi --log-file - --bind 0.0.0.0:$PORT"
+cmd = "python manage.py migrate --noinput && gunicorn agrismart.wsgi --bind 0.0.0.0:$PORT --workers 3 --timeout 120"

@@ -1,11 +1,13 @@
+from urllib.parse import quote
 from rest_framework import viewsets, permissions, status
 from rest_framework.views import APIView
 from rest_framework.response import Response
 from rest_framework.decorators import action
 from django.utils import timezone
 from .models import WeatherRecord, SoilHealth, CommodityPrice, PestAlert, ConsultMessage, FarmRegion, ChatMessage
-from .serializers import (WeatherRecordSerializer, SoilHealthSerializer, CommodityPriceSerializer, 
+from .serializers import (WeatherRecordSerializer, SoilHealthSerializer, CommodityPriceSerializer,
                           PestAlertSerializer, ConsultMessageSerializer, FarmRegionSerializer, ChatMessageSerializer)
+
 
 class IsAdminOrReadOnly(permissions.BasePermission):
     def has_permission(self, request, view):
@@ -13,38 +15,43 @@ class IsAdminOrReadOnly(permissions.BasePermission):
             return True
         return request.user and request.user.is_authenticated and request.user.role == 'admin'
 
+
 class WeatherRecordViewSet(viewsets.ModelViewSet):
-    queryset = WeatherRecord.objects.all().order_by('date')
+    queryset = WeatherRecord.objects.all()
     serializer_class = WeatherRecordSerializer
     permission_classes = [IsAdminOrReadOnly]
+
 
 class SoilHealthViewSet(viewsets.ModelViewSet):
     queryset = SoilHealth.objects.all()
     serializer_class = SoilHealthSerializer
     permission_classes = [IsAdminOrReadOnly]
-    
+
     @action(detail=False, methods=['get'])
     def by_sector(self, request):
         sector = request.query_params.get('sector', '')
         if sector:
-            soil = SoilHealth.objects.filter(sector__icontains=sector).first()
+            soil = SoilHealth.objects.filter(sector__icontains=sector).order_by('-last_tested').first()
             if soil:
                 return Response(SoilHealthSerializer(soil).data)
-        
-        first_soil = SoilHealth.objects.first()
+
+        first_soil = SoilHealth.objects.order_by('-last_tested').first()
         if first_soil:
             return Response(SoilHealthSerializer(first_soil).data)
         return Response({"error": "No soil record found"}, status=status.HTTP_404_NOT_FOUND)
 
+
 class CommodityPriceViewSet(viewsets.ModelViewSet):
-    queryset = CommodityPrice.objects.all().order_by('crop')
+    queryset = CommodityPrice.objects.all()
     serializer_class = CommodityPriceSerializer
     permission_classes = [IsAdminOrReadOnly]
 
+
 class PestAlertViewSet(viewsets.ModelViewSet):
-    queryset = PestAlert.objects.all().order_by('-issued_at')
+    queryset = PestAlert.objects.all()
     serializer_class = PestAlertSerializer
     permission_classes = [IsAdminOrReadOnly]
+
 
 class ConsultMessageViewSet(viewsets.ModelViewSet):
     serializer_class = ConsultMessageSerializer
@@ -53,8 +60,8 @@ class ConsultMessageViewSet(viewsets.ModelViewSet):
     def get_queryset(self):
         user = self.request.user
         if user.role == 'admin':
-            return ConsultMessage.objects.all().order_by('-created_at')
-        return ConsultMessage.objects.filter(sender=user).order_by('-created_at')
+            return ConsultMessage.objects.select_related('sender', 'replied_by').all()
+        return ConsultMessage.objects.select_related('sender', 'replied_by').filter(sender=user)
 
     def perform_create(self, serializer):
         serializer.save(sender=self.request.user)
@@ -63,18 +70,18 @@ class ConsultMessageViewSet(viewsets.ModelViewSet):
     def reply(self, request, pk=None):
         if request.user.role != 'admin':
             return Response({"error": "Unauthorized. Only admins can reply."}, status=status.HTTP_403_FORBIDDEN)
-        
+
         message = self.get_object()
         reply_text = request.data.get('reply', '')
         if not reply_text:
             return Response({"error": "Reply text is required."}, status=status.HTTP_400_BAD_REQUEST)
-        
+
         message.reply = reply_text
         message.replied_at = timezone.now()
         message.replied_by = request.user
         message.read_by_farmer = False
         message.save()
-        
+
         return Response(ConsultMessageSerializer(message).data)
 
     @action(detail=True, methods=['post'], permission_classes=[permissions.IsAuthenticated])
@@ -84,10 +91,12 @@ class ConsultMessageViewSet(viewsets.ModelViewSet):
         message.save()
         return Response({"status": "Message marked as read"})
 
+
 class FarmRegionViewSet(viewsets.ModelViewSet):
     queryset = FarmRegion.objects.all()
     serializer_class = FarmRegionSerializer
     permission_classes = [IsAdminOrReadOnly]
+
 
 class FarmingSearchView(APIView):
     permission_classes = [permissions.IsAuthenticated]
@@ -155,11 +164,11 @@ class FarmingSearchView(APIView):
                 match_score += 10
             if query in article["snippet"].lower():
                 match_score += 5
-            
+
             for keyword in article["keywords"]:
                 if keyword in query or query in keyword:
                     match_score += 3
-            
+
             if match_score > 0:
                 results.append({
                     "title": article["title"],
@@ -178,11 +187,12 @@ class FarmingSearchView(APIView):
                 "category": "General Search",
                 "source": "Integrated Smart Farming Search Index",
                 "snippet": f"Your search for '{query}' returned no direct matching documents. Based on global agricultural feeds, we recommend consulting our localized agronomist inbox or verifying regional soil diagnostics for detailed answers.",
-                "url": f"https://www.google.com/search?q=agriculture+{query.replace(' ', '+')}",
+                "url": f"https://www.google.com/search?q=agriculture+{quote(query)}",
                 "score": 1
             })
 
         return Response({"results": results})
+
 
 class ChatMessageViewSet(viewsets.ModelViewSet):
     serializer_class = ChatMessageSerializer
@@ -191,18 +201,16 @@ class ChatMessageViewSet(viewsets.ModelViewSet):
     def get_queryset(self):
         user = self.request.user
         if user.role == 'admin':
-            return ChatMessage.objects.all().order_by('timestamp')
-        return ChatMessage.objects.filter(farmer=user).order_by('timestamp')
+            return ChatMessage.objects.select_related('farmer').all()
+        return ChatMessage.objects.select_related('farmer').filter(farmer=user)
 
     def perform_create(self, serializer):
-        # Save farmer's message
+        import random
         farmer_message = serializer.save(farmer=self.request.user, sender_type='FARMER')
-        
+
         mode = self.request.data.get('mode', 'AI')
-        
+
         if mode == 'AI':
-            # Mock AI Response
-            import random
             mock_replies = [
                 "That's a great question. Based on regional data, I recommend testing your soil pH first.",
                 "I've analyzed your request. You might want to consider crop rotation for the next season.",
