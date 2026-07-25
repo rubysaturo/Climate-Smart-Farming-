@@ -14,10 +14,16 @@ class UserSerializer(serializers.ModelSerializer):
 
 class RegisterSerializer(serializers.ModelSerializer):
     password = serializers.CharField(write_only=True, min_length=8)
+    email = serializers.EmailField(required=True)
 
     class Meta:
         model = User
-        fields = ('username', 'password', 'email', 'name', 'phone_number', 'sector')
+        fields = ('username', 'password', 'email', 'name', 'phone_number', 'sector', 'supabase_uid')
+
+    def validate_username(self, value):
+        if User.objects.filter(username__iexact=value).exists():
+            raise serializers.ValidationError("A user with this username already exists.")
+        return value
 
     def validate_email(self, value):
         if not value:

@@ -7,20 +7,20 @@ const LoginPage = () => {
   const { login, isAuthenticated } = useAuth();
   const { addToast } = useToast();
   const navigate = useNavigate();
-  const [form, setForm] = useState({ username: "", password: "" });
+  const [form, setForm] = useState({ identifier: "", password: "" });
   const [loading, setLoading] = useState(false);
 
   if (isAuthenticated) return <Navigate to="/dashboard" replace />;
 
   const handleSubmit = async (e) => {
     e.preventDefault();
-    if (!form.username || !form.password) {
+    if (!form.identifier || !form.password) {
       addToast("Please fill in all fields", "warning");
       return;
     }
     setLoading(true);
     try {
-      const user = await login(form.username, form.password);
+      const user = await login(form.identifier, form.password);
       addToast(`Welcome back, ${user.username}!`, "success");
       navigate(user.role === "admin" ? "/admin" : "/dashboard");
     } catch (err) {
@@ -43,13 +43,13 @@ const LoginPage = () => {
         </div>
         <form onSubmit={handleSubmit} className="auth-form">
           <div className="form-group">
-            <label htmlFor="username">Username</label>
+            <label htmlFor="identifier">Username or Email</label>
             <input
-              id="username"
+              id="identifier"
               type="text"
-              value={form.username}
-              onChange={(e) => setForm({ ...form, username: e.target.value })}
-              placeholder="Enter your username"
+              value={form.identifier}
+              onChange={(e) => setForm({ ...form, identifier: e.target.value })}
+              placeholder="Enter username or email"
               autoComplete="username"
             />
           </div>

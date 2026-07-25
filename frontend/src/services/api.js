@@ -182,7 +182,7 @@ function extractValidationErrors(data) {
 
 export const auth = {
   /** POST /api/auth/login/ → { access, refresh, user } */
-  login: (username, password) => api.post("/auth/login/", { username, password }),
+  login: (identifier, password) => api.post("/auth/login/", { username: identifier, password }),
 
   /** POST /api/auth/login/refresh/ → { access, refresh? } */
   refreshToken: (refresh) => api.post("/auth/login/refresh/", { refresh }),

@@ -2,10 +2,8 @@ import { createContext, useContext, useState, useEffect, useCallback, useMemo } 
 import { auth } from "@/services/api";
 import {
   supabase,
-  signIn as sbSignIn,
   signUp as sbSignUp,
   signOut as sbSignOut,
-  getSession as sbGetSession,
   onAuthStateChange as sbOnAuthStateChange,
 } from "@/services/supabase";
 
@@ -74,19 +72,6 @@ export const AuthProvider = ({ children }) => {
       const token = localStorage.getItem(STORAGE_KEYS.ACCESS);
       if (token) {
         await fetchDjangoProfile();
-        if (!cancelled) setLoading(false);
-        return;
-      }
-
-      if (SUPABASE_ENABLED) {
-        try {
-          const session = await sbGetSession();
-          if (session?.user && !cancelled) {
-            await fetchDjangoProfile();
-          }
-        } catch {
-          // ignore
-        }
       }
 
       if (!cancelled) setLoading(false);
@@ -98,22 +83,18 @@ export const AuthProvider = ({ children }) => {
   useEffect(() => {
     if (!SUPABASE_ENABLED) return;
 
-    const unsub = sbOnAuthStateChange(async (event, session) => {
+    const unsub = sbOnAuthStateChange(async (event) => {
       if (event === "SIGNED_OUT") {
         setUser(null);
         clearAuthStorage();
-        return;
-      }
-      if (event === "SIGNED_IN" && session?.user) {
-        await fetchDjangoProfile();
       }
     });
 
     return unsub;
-  }, [fetchDjangoProfile]);
+  }, []);
 
-  const login = useCallback(async (username, password) => {
-    const { data } = await auth.login(username, password);
+  const login = useCallback(async (identifier, password) => {
+    const { data } = await auth.login(identifier, password);
     const u = buildUser(data.user);
 
     localStorage.setItem(STORAGE_KEYS.ACCESS, data.access);
@@ -121,32 +102,24 @@ export const AuthProvider = ({ children }) => {
     saveUser(u);
     setUser(u);
 
-    if (SUPABASE_ENABLED && u.email) {
-      sbSignIn({ email: u.email, password }).catch(() => {});
-    }
-
     return u;
   }, []);
 
   const register = useCallback(async (payload) => {
-    let supabaseUid = null;
+    const { data } = await auth.register(payload);
 
     if (SUPABASE_ENABLED) {
       try {
-        const result = await sbSignUp({
+        await sbSignUp({
           email: payload.email,
           password: payload.password,
           metadata: { username: payload.username, name: payload.name || payload.username },
         });
-        if (result.user) {
-          supabaseUid = result.user.id;
-        }
       } catch (sbErr) {
         console.warn("[AuthContext] Supabase signUp failed (non-critical):", sbErr.message);
       }
     }
 
-    const { data } = await auth.register({ ...payload, supabase_uid: supabaseUid });
     return data;
   }, []);
 
