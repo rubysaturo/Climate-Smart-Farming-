@@ -8,8 +8,9 @@ class UserSerializer(serializers.ModelSerializer):
     class Meta:
         model = User
         fields = ('id', 'username', 'email', 'name', 'role', 'phone_number', 'sector',
-                  'sms_weather', 'sms_soil', 'sms_market', 'sms_app', 'profile_picture')
-        read_only_fields = ('id', 'role')
+                  'sms_weather', 'sms_soil', 'sms_market', 'sms_app', 'profile_picture',
+                  'supabase_uid')
+        read_only_fields = ('id', 'role', 'supabase_uid')
 
 
 class RegisterSerializer(serializers.ModelSerializer):
@@ -38,6 +39,16 @@ class RegisterSerializer(serializers.ModelSerializer):
         user.set_password(password)
         user.save()
         return user
+
+
+class SyncSupabaseUidSerializer(serializers.Serializer):
+    supabase_uid = serializers.UUIDField(required=True)
+
+    def validate_supabase_uid(self, value):
+        existing = User.objects.filter(supabase_uid=value).first()
+        if existing and existing != self.context['request'].user:
+            raise serializers.ValidationError("This Supabase account is already linked to another user.")
+        return value
 
 
 class UserProfileUpdateSerializer(serializers.ModelSerializer):

@@ -106,20 +106,24 @@ export const AuthProvider = ({ children }) => {
   }, []);
 
   const register = useCallback(async (payload) => {
-    const { data } = await auth.register(payload);
+    let supabaseUid = null;
 
     if (SUPABASE_ENABLED) {
       try {
-        await sbSignUp({
+        const result = await sbSignUp({
           email: payload.email,
           password: payload.password,
           metadata: { username: payload.username, name: payload.name || payload.username },
         });
+        if (result.user?.id) {
+          supabaseUid = result.user.id;
+        }
       } catch (sbErr) {
         console.warn("[AuthContext] Supabase signUp failed (non-critical):", sbErr.message);
       }
     }
 
+    const { data } = await auth.register({ ...payload, supabase_uid: supabaseUid });
     return data;
   }, []);
 

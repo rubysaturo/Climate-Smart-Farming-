@@ -290,8 +290,10 @@ class ProfileTest(APITestCase):
     def test_profile_excludes_sensitive_fields(self):
         response = self.client.get("/api/auth/me/")
         self.assertNotIn("password", response.data)
-        self.assertNotIn("supabase_uid", response.data)
         self.assertNotIn("last_login", response.data)
+        # supabase_uid IS included (read-only) — frontend needs it for Supabase queries
+        self.assertIn("supabase_uid", response.data)
+        self.assertIsNone(response.data["supabase_uid"])
 
 
 class EndToEndAuthFlowTest(APITestCase):
@@ -401,3 +403,72 @@ class AuthBackendTest(TestCase):
         self.assertIsNone(user)
         user = authenticate(username="testuser", password=None)
         self.assertIsNone(user)
+
+
+class SyncSupabaseUidTest(APITestCase):
+    """POST /api/auth/sync-supabase-uid/"""
+
+    def setUp(self):
+        self.user = User.objects.create_user(
+            username="farmer1",
+            email="farmer1@example.com",
+            password="securepass123",
+        )
+        refresh = RefreshToken.for_user(self.user)
+        self.access_token = str(refresh.access_token)
+        self.client.credentials(HTTP_AUTHORIZATION=f"Bearer {self.access_token}")
+
+    def test_sync_supabase_uid(self):
+        import uuid
+        uid = uuid.uuid4()
+        response = self.client.post("/api/auth/sync-supabase-uid/", {"supabase_uid": str(uid)})
+        self.assertEqual(response.status_code, status.HTTP_200_OK)
+        self.user.refresh_from_db()
+        self.assertEqual(str(self.user.supabase_uid), str(uid))
+
+    def test_sync_requires_authentication(self):
+        self.client.credentials()
+        import uuid
+        uid = uuid.uuid4()
+        response = self.client.post("/api/auth/sync-supabase-uid/", {"supabase_uid": str(uid)})
+        self.assertEqual(response.status_code, status.HTTP_401_UNAUTHORIZED)
+
+    def test_sync_rejects_missing_uid(self):
+        response = self.client.post("/api/auth/sync-supabase-uid/", {})
+        self.assertEqual(response.status_code, status.HTTP_400_BAD_REQUEST)
+
+    def test_sync_rejects_invalid_uuid(self):
+        response = self.client.post("/api/auth/sync-supabase-uid/", {"supabase_uid": "not-a-uuid"})
+        self.assertEqual(response.status_code, status.HTTP_400_BAD_REQUEST)
+
+    def test_sync_rejects_duplicate_uid_other_user(self):
+        import uuid
+        uid = uuid.uuid4()
+        other_user = User.objects.create_user(
+            username="farmer2", email="farmer2@example.com",
+            password="securepass123", supabase_uid=uid,
+        )
+        response = self.client.post("/api/auth/sync-supabase-uid/", {"supabase_uid": str(uid)})
+        self.assertEqual(response.status_code, status.HTTP_400_BAD_REQUEST)
+
+    def test_sync_allows_same_uid_on_own_account(self):
+        import uuid
+        uid = uuid.uuid4()
+        self.user.supabase_uid = uid
+        self.user.save(update_fields=["supabase_uid"])
+        response = self.client.post("/api/auth/sync-supabase-uid/", {"supabase_uid": str(uid)})
+        self.assertEqual(response.status_code, status.HTTP_200_OK)
+
+    def test_register_with_supabase_uid(self):
+        import uuid
+        uid = uuid.uuid4()
+        data = {
+            "username": "farmer3",
+            "email": "farmer3@example.com",
+            "password": "securepass123",
+            "supabase_uid": str(uid),
+        }
+        response = self.client.post("/api/auth/register/", data)
+        self.assertEqual(response.status_code, status.HTTP_201_CREATED)
+        user = User.objects.get(username="farmer3")
+        self.assertEqual(str(user.supabase_uid), str(uid))

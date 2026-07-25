@@ -1,6 +1,6 @@
 from django.urls import path
 from rest_framework_simplejwt.views import TokenRefreshView
-from .views import CustomTokenObtainPairView, RegisterView, UserProfileView, LogoutView
+from .views import CustomTokenObtainPairView, RegisterView, UserProfileView, LogoutView, SyncSupabaseUidView
 
 urlpatterns = [
     path('login/', CustomTokenObtainPairView.as_view(), name='auth_login'),
@@ -8,4 +8,5 @@ urlpatterns = [
     path('register/', RegisterView.as_view(), name='auth_register'),
     path('logout/', LogoutView.as_view(), name='auth_logout'),
     path('me/', UserProfileView.as_view(), name='auth_profile'),
+    path('sync-supabase-uid/', SyncSupabaseUidView.as_view(), name='auth_sync_supabase_uid'),
 ]

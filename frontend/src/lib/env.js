@@ -68,9 +68,23 @@ function optionalEnv(key, fallback = "") {
 
 const env = Object.freeze({
   // ── Required ────────────────────────────────────────────────────────────
-  API_URL: requireEnv("VITE_API_URL", {
-    hint: "The Django backend URL, e.g. http://127.0.0.1:8000 (no trailing slash).",
-  }),
+  API_URL: (() => {
+    const url = requireEnv("VITE_API_URL", {
+      hint: "The Django backend URL, e.g. http://127.0.0.1:8000 (no trailing slash).",
+    });
+    // In production, reject localhost/127.0.0.1 URLs — they won't work on Vercel/Render.
+    if (!isDev && url && /^(https?:\/\/)(localhost|127\.0\.0\.1)/.test(url)) {
+      const msg = [
+        "[env] VITE_API_URL points to localhost in production!",
+        `  Current value: ${url}`,
+        "  Set VITE_API_URL to your deployed backend URL in the Vercel dashboard.",
+        "  Example: https://your-app.onrender.com",
+      ].join("\n");
+      console.error(msg);
+      throw new Error(msg);
+    }
+    return url;
+  })(),
 
   // ── Optional — Supabase ────────────────────────────────────────────────
   SUPABASE_URL: optionalEnv("VITE_SUPABASE_URL"),

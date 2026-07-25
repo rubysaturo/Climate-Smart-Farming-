@@ -5,7 +5,7 @@ from rest_framework_simplejwt.views import TokenObtainPairView
 from rest_framework_simplejwt.serializers import TokenObtainPairSerializer
 from rest_framework_simplejwt.tokens import RefreshToken
 from django.contrib.auth import get_user_model
-from .serializers import UserSerializer, RegisterSerializer, UserProfileUpdateSerializer
+from .serializers import UserSerializer, RegisterSerializer, SyncSupabaseUidSerializer, UserProfileUpdateSerializer
 
 User = get_user_model()
 
@@ -71,3 +71,15 @@ class UserProfileView(generics.RetrieveUpdateAPIView):
         if self.request.method in ['PUT', 'PATCH']:
             return UserProfileUpdateSerializer
         return UserSerializer
+
+
+class SyncSupabaseUidView(APIView):
+    """Link a Supabase Auth UID to the authenticated Django user."""
+    permission_classes = (permissions.IsAuthenticated,)
+
+    def post(self, request):
+        serializer = SyncSupabaseUidSerializer(data=request.data, context={'request': request})
+        serializer.is_valid(raise_exception=True)
+        request.user.supabase_uid = serializer.validated_data['supabase_uid']
+        request.user.save(update_fields=['supabase_uid'])
+        return Response({"message": "Supabase UID synced successfully"}, status=status.HTTP_200_OK)

@@ -3,9 +3,13 @@ import env from "@/lib/env";
 
 // ── Configuration ────────────────────────────────────────────────────────────
 
-const BASE_URL = env.API_URL || "/api";
+const BASE_URL = env.API_URL;
+if (!BASE_URL && import.meta.env.PROD) {
+  throw new Error("[api] VITE_API_URL is empty in production. Set it in the Vercel dashboard.");
+}
+const EFFECTIVE_BASE = BASE_URL || "/api";
 const TIMEOUT_MS = 15_000;
-const REFRESH_ENDPOINT = `${BASE_URL}/auth/login/refresh/`;
+const REFRESH_ENDPOINT = `${EFFECTIVE_BASE}/auth/login/refresh/`;
 
 const STORAGE_KEYS = Object.freeze({
   ACCESS: "csf_access",
@@ -16,7 +20,7 @@ const STORAGE_KEYS = Object.freeze({
 // ── Axios instance ───────────────────────────────────────────────────────────
 
 const api = axios.create({
-  baseURL: BASE_URL,
+  baseURL: EFFECTIVE_BASE,
   timeout: TIMEOUT_MS,
   headers: { "Content-Type": "application/json" },
 });
@@ -198,6 +202,9 @@ export const auth = {
       sector: payload.sector || "",
       supabase_uid: payload.supabase_uid || null,
     }),
+
+  /** POST /api/auth/sync-supabase-uid/ → { message } */
+  syncSupabaseUid: (supabaseUid) => api.post("/auth/sync-supabase-uid/", { supabase_uid: supabaseUid }),
 
   /** POST /api/auth/logout/ → 204 */
   logout: (refresh) => api.post("/auth/logout/", { refresh }),
